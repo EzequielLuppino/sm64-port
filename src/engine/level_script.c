@@ -24,6 +24,7 @@
 #include "math_util.h"
 #include "surface_collision.h"
 #include "surface_load.h"
+#include "debug_log.h"
 
 #if defined TARGET_N3DS
 #include "pc/audio/audio_3ds_threading.h"
@@ -108,6 +109,8 @@ static void level_cmd_load_and_execute(void) {
 static void level_cmd_exit_and_execute(void) {
     void *targetAddr = CMD_GET(void *, 12);
 
+    DBG_LOG("level_script: exit_and_execute seg=%d", CMD_GET(s16, 2));
+
     main_pool_pop_state();
     main_pool_push_state();
 
@@ -119,6 +122,7 @@ static void level_cmd_exit_and_execute(void) {
 }
 
 static void level_cmd_exit(void) {
+    DBG_LOG("level_script: exit");
     main_pool_pop_state();
 
     sStackTop = sStackBase;
@@ -316,6 +320,7 @@ static void level_cmd_init_level(void) {
 }
 
 static void level_cmd_clear_level(void) {
+    DBG_LOG("level_script: clear_level");
     clear_objects();
     clear_area_graph_nodes();
     clear_areas();
@@ -849,6 +854,17 @@ struct LevelCommand *level_script_execute(struct LevelCommand *cmd) {
     else
         waitForSynchronizationVar(&s_audio_frames_to_tick);
 
+#ifdef ENABLE_DEBUG_LOG
+    {
+        static u32 sLastDebugFrame = 0;
+
+        if (gGlobalTimer - sLastDebugFrame >= 60) {
+            sLastDebugFrame = gGlobalTimer;
+            DBG_LOG("thread5: frame=%u tick=%d proc=%d", (unsigned) gGlobalTimer,
+                    (int) s_audio_frames_to_tick, (int) s_audio_frames_to_process);
+        }
+    }
+#endif
 
     profiler_3ds_log_time(0);
     // Execute the script

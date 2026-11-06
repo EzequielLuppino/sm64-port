@@ -28,6 +28,7 @@
 #include "level_table.h"
 #include "course_table.h"
 #include "thread6.h"
+#include "debug_log.h"
 
 #if defined TARGET_N3DS && !defined DISABLE_AUDIO
     #include "src/pc/audio/audio_3ds_threading.h"
@@ -1160,6 +1161,8 @@ s32 update_level(void) {
 #endif
 
     if (changeLevel) {
+        DBG_LOG("level: changeLevel=%d from level=%d area=%d save=%d", changeLevel,
+                gCurrLevelNum, gCurrAreaIndex, gCurrSaveFileNum);
         reset_volume();
         enable_background_sound();
     }

@@ -53,8 +53,6 @@ extern C3D_RenderTarget *gTarget;
 extern C3D_RenderTarget *gTargetRight;
 extern C3D_RenderTarget *gTargetBottom;
 
-extern bool gBottomScreenNeedsRender;
-
 extern int uLoc_projection, uLoc_modelView;
 
 extern float gSliderLevel;
@@ -68,7 +66,6 @@ typedef enum
 } Gfx3DSMode;
 
 extern bool gShouldRun;
-extern bool gShowConfigMenu;
 
 extern struct GfxWindowManagerAPI gfx_3ds;
 extern Gfx3DSMode gGfx3DSMode;

@@ -784,7 +784,9 @@ static void gfx_sp_tri1(uint8_t vtx1_idx, uint8_t vtx2_idx, uint8_t vtx3_idx) {
                          *((int32_t*) &v3->w) ^
                          ((rsp.geometry_mode & G_CULL_FRONT) << 22);
 
-        if (oops >= 0) return;
+        if (oops >= 0) {
+            return;
+        }
 #else
         // Slow maffs
         if ((v1->w < 0) ^ (v2->w < 0) ^ (v3->w < 0)) {
@@ -908,7 +910,7 @@ static void gfx_sp_tri1(uint8_t vtx1_idx, uint8_t vtx2_idx, uint8_t vtx3_idx) {
     for (int i = 0; i < 3; i++) {
 
 #ifdef TARGET_N3DS
-        float w = v_arr[i]->w, z = (v_arr[i]->z + w) / -2.0f; // 3DS is always 0 to 1
+        float w = v_arr[i]->w, z = (v_arr[i]->z - w) * 0.5f; // map near -> -w, far -> 0 (PICA range)
 #else
         float z = v_arr[i]->z, w = v_arr[i]->w;
         if (z_is_from_0_to_1) {

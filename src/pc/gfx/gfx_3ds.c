@@ -6,7 +6,9 @@
 
 #include "gfx_3ds.h"
 #include "gfx_3ds_menu.h"
+#include "menu/file_select.h"
 #include "gfx_citro3d.h"
+#include "debug_log.h"
 
 #include "src/pc/audio/audio_3ds_threading.h"
 #include "src/pc/audio/audio_3ds.h"
@@ -45,8 +47,6 @@ C3D_RenderTarget *gTarget;
 C3D_RenderTarget *gTargetRight;
 C3D_RenderTarget *gTargetBottom;
 
-bool gBottomScreenNeedsRender;
-
 int uLoc_projection, uLoc_modelView;
 
 float gSliderLevel;
@@ -54,11 +54,11 @@ float gSliderLevel;
 Gfx3DSMode gGfx3DSMode;
 bool gGfx3DEnabled;
 
-bool gShowConfigMenu = false;
 bool gShouldRun = true;
 bool gUpdateSliderFlag = false;
 
 static u8 debounce = 0;
+static bool touchActive = false;
 static s32 appSuspendCounter = 0; // > 0 when the 3DS lid is closed or home button is pressed
 static u8 n3dsModel = 0;
 static aptHookCookie apt_hook_cookie;
@@ -140,7 +140,7 @@ static void initialise_screens()
     // TODO: refactor; this is (also) set in gfx_citro3d_init,
     C3D_CullFace(GPU_CULL_NONE);
     C3D_DepthMap(true, -1.0f, 0);
-    C3D_DepthTest(false, GPU_LEQUAL, GPU_WRITE_ALL);
+    C3D_DepthTest(false, GPU_GREATER, GPU_WRITE_ALL);
     C3D_AlphaTest(true, GPU_GREATER, 0x00);
 
     gTargetBottom = C3D_RenderTargetCreate(240, 320, GPU_RB_RGBA8, GPU_RB_DEPTH24_STENCIL8);
@@ -155,6 +155,7 @@ static void initialise_screens()
 
 static void gfx_3ds_update_stereoscopy(void)
 {
+    DBG_LOG("gfx: stereoscopy update slider=%.2f oldMode=%d old3D=%d", gSliderLevel, gGfx3DSMode, gGfx3DEnabled);
 	if(gSliderLevel > 0.0)
     {
 		gfx_config.useAA = false;
@@ -168,8 +169,6 @@ static void gfx_3ds_update_stereoscopy(void)
         gGfx3DEnabled = false;
 	}
 
-    gBottomScreenNeedsRender = true;
-
 	deinitialise_screens();
     initialise_screens();
 }
@@ -179,40 +178,64 @@ static void gfx_3ds_handle_touch() {
     touchPosition pos;
     hidTouchRead(&pos);
 
+    bool touching = (pos.px || pos.py) != 0;
+
     if (debounce > 0)
         debounce--;
 
-    if (debounce == 0 && (pos.px || pos.py) && (pos.px < 160))
+    // While the file-select cursor is on screen the bottom screen is a
+    // touchpad for it: drag to aim, lift the finger to click. The
+    // MAP/CHEATS/SETUP interface is not available in the menus.
+    if (gFileSelectCursorActive)
+    {
+        if (touching)
+        {
+            // Touch (0,0)-(320,240) -> menu space (-160,120)-(-160,120).
+            file_select_menu_touch_move((float) pos.px - 160.0f, 120.0f - (float) pos.py);
+            gTouchpadX = pos.px;
+            gTouchpadY = pos.py;
+        }
+        else if (touchActive)
+        {
+            file_select_menu_touch_click();
+            DBG_LOG("gfx: menu cursor click at (%d,%d)", gTouchpadX, gTouchpadY);
+        }
+
+        gTouchpadHeld = touching;
+        touchActive = touching;
+        return;
+    }
+
+    // Outside the menus, forget the old touchpad marker.
+    gTouchpadX = -1;
+    gTouchpadY = -1;
+    gTouchpadHeld = false;
+
+    // Only trigger on a fresh touch so that holding a finger down does not
+    // repeatedly toggle the same option.
+    if (touching && !touchActive && debounce == 0)
     {
         debounce = DEBOUNCE_FRAMES; // wait quarter second between mashing
         menu_action res = gfx_3ds_menu_on_touch(pos.px, pos.py);
 
+        DBG_LOG("gfx: touch at (%d,%d) action=%d", pos.px, pos.py, res);
+
         switch (res) {
             case CONFIG_CHANGED: {
-                gBottomScreenNeedsRender = true;
                 deinitialise_screens();
                 initialise_screens();
                 break;
             }
 
-            case SHOW_MENU: {
-                gBottomScreenNeedsRender = true;
-                gShowConfigMenu = true;
-                break;
-            }
-
-            case EXIT_MENU: {
-                gBottomScreenNeedsRender = true;
-                gShowConfigMenu = false;
-                break;
-            }
-
+            case TAB_CHANGED:
             default:
             case DO_NOTHING: {
                 break;
             }
         }
     }
+
+    touchActive = touching;
 }
 
 // Called whenever a 3DS OS event is fired. Runs synchronously on thread5.
@@ -276,6 +299,7 @@ static void gfx_3ds_apt_hook(APT_HookType hook, UNUSED void* param)
 
 static void gfx_3ds_init(UNUSED const char *game_name, UNUSED bool start_in_fullscreen)
 {
+    DBG_LOG("gfx: init start");
     if (checkN3DS())
         osSetSpeedupEnable(true);
 
@@ -298,10 +322,11 @@ static void gfx_3ds_init(UNUSED const char *game_name, UNUSED bool start_in_full
     gfx_3ds_update_stereoscopy();
     
     // Clear all framebuffers. Right-hand screen crashes if cleared in an invalid mode.
-    C3D_RenderTargetClear(gTarget, C3D_CLEAR_ALL, 0x000000FF, 0xFFFFFFFF);
+    C3D_RenderTargetClear(gTarget, C3D_CLEAR_ALL, 0x000000FF, 0);
     C3D_RenderTargetClear(gTargetBottom, C3D_CLEAR_ALL, 0x000000FF, 0xFFFFFFFF);
     if (gGfx3DSMode == GFX_3DS_MODE_NORMAL || gGfx3DSMode == GFX_3DS_MODE_AA_22)
-        C3D_RenderTargetClear(gTargetRight, C3D_CLEAR_ALL, 0x000000FF, 0xFFFFFFFF);
+        C3D_RenderTargetClear(gTargetRight, C3D_CLEAR_ALL, 0x000000FF, 0);
+    DBG_LOG("gfx: init done mode=%d 3D=%d slider=%.2f", gGfx3DSMode, gGfx3DEnabled, gSliderLevel);
 }
 
 static void gfx_set_keyboard_callbacks(UNUSED bool (*on_key_down)(int scancode), UNUSED bool (*on_key_up)(int scancode), UNUSED void (*on_all_keys_up)(void))
@@ -362,9 +387,6 @@ static void gfx_3ds_handle_events(void)
     {
 		gfx_3ds_update_stereoscopy();
     }
-
-    if (gBottomScreenNeedsRender)
-        gfx_citro3d_set_viewport_clear_buffer(VIEW_BOTTOM_SCREEN, VIEW_CLEAR_BUFFER_COLOR);
 }
 
 float cpu_time, gpu_time;

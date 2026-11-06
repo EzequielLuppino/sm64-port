@@ -9,6 +9,7 @@
 #include "macros.h"
 #include "audio_3ds.h"
 #include "src/audio/external.h"
+#include "debug_log.h"
 
 #define PLAYBACK_RATE 32000
 
@@ -66,6 +67,10 @@ volatile bool s_audio_thread_processing = false;
 // Synchronization variables
 static volatile bool running = true;
 
+// Set once the DSP service is usable. If ndspInit() fails (no DSP firmware
+// available), audio output is disabled but the game must keep running.
+static bool s_dsp_ready = false;
+
 // Statically allocate to improve performance
 static s16 audio_buffer [2 * SAMPLES_HIGH * N3DS_DSP_N_CHANNELS];
 
@@ -81,6 +86,11 @@ static bool is_new_n3ds()
 }
 
 extern void create_next_audio_buffer(s16 *samples, u32 num_samples);
+
+// Embedded OpenDSP firmware (BSD-2-Clause, see 3ds/OPENDSP_LICENSE.txt).
+// Used when the console has no /3ds/dspfirm.cdc and no hb:ndsp handle.
+extern const u8 opendsp_cdc[];
+extern const u32 opendsp_cdc_size;
 
 static int sNextBuffer;
 static volatile ndspWaveBuf sDspBuffers[N3DS_DSP_DMA_BUFFER_COUNT];
@@ -106,6 +116,13 @@ static int audio_3ds_get_desired_buffered(void)
 // Returns true if the next buffer is FREE or DONE. Available in audio_3ds.h.
 bool audio_3ds_next_buffer_is_ready()
 {
+    // The synthesis code uses this to write straight into the DSP buffer.
+    // Never report a buffer as ready when there is no working DSP (or the
+    // DMA buffers were not allocated), otherwise it would write through a
+    // NULL direct_buf pointer.
+    if (!s_dsp_ready)
+        return false;
+
     const u8 status = sDspBuffers[sNextBuffer].status;
     return status == NDSP_WBUF_FREE || status == NDSP_WBUF_DONE;
 }
@@ -113,6 +130,11 @@ bool audio_3ds_next_buffer_is_ready()
 // Copies len_to_copy bytes from src to the audio buffer, then submits len_total to play. 
 static void audio_3ds_play_internal(const uint8_t *src, size_t len_total, size_t len_to_copy)
 {
+    // Without a working DSP the wave buffers ARE queued by libctru but never
+    // become free again, which would eventually block this thread forever.
+    if (!s_dsp_ready)
+        return;
+
     if (len_total > N3DS_DSP_DMA_BUFFER_SIZE)
         return;
     
@@ -225,6 +247,7 @@ static void audio_3ds_initialize_thread()
     }
 
     // Create a thread if applicable
+    DBG_LOG("audio: selected cpu=%d", s_audio_cpu);
     if (s_audio_cpu != OLD_CORE_0) {
 
         printf("Audio thread priority: 0x%x\n", N3DS_DESIRED_PRIORITY_AUDIO_THREAD);
@@ -251,14 +274,33 @@ static void audio_3ds_initialize_thread()
     } else {
         s_thread5_does_audio = false;
     }
+    DBG_LOG("audio: thread=%p settled=%d thread5_does_audio=%d", (void *) threadId,
+            s_audio_thread_processing, s_thread5_does_audio);
 }
 
 union NdspMix ndsp_mix;
 
 static void audio_3ds_initialize_dsp()
 {
-    ndspInit();
+    Result rc = ndspInit();
+    DBG_LOG("audio: ndspInit rc=0x%08lx", (unsigned long) rc);
 
+    if (R_FAILED(rc)) {
+        // No system DSP firmware: retry with the embedded OpenDSP image.
+        DBG_LOG("audio: system DSP firmware unavailable, loading OpenDSP");
+        ndspUseComponent(opendsp_cdc, opendsp_cdc_size, 0xFF, 0xFF);
+        rc = ndspInit();
+        DBG_LOG("audio: ndspInit(opendsp) rc=0x%08lx", (unsigned long) rc);
+    }
+
+    if (R_FAILED(rc)) {
+        // Continue silently instead of hanging the game on dead wave buffers.
+        DBG_LOG("audio: DSP unavailable, continuing without sound");
+        s_dsp_ready = false;
+        return;
+    }
+
+    s_dsp_ready = true;
     ndspSetOutputMode(NDSP_OUTPUT_STEREO);
     ndspChnReset(0);
     ndspChnWaveBufClear(0);
@@ -272,6 +314,12 @@ static void audio_3ds_initialize_dsp()
     ndspChnSetMix(0, ndsp_mix.raw);
 
     u8* bufferData = linearAlloc(N3DS_DSP_DMA_BUFFER_SIZE * N3DS_DSP_DMA_BUFFER_COUNT);
+    if (bufferData == NULL) {
+        DBG_LOG("audio: failed to allocate DMA buffers");
+        s_dsp_ready = false;
+        return;
+    }
+
     for (int i = 0; i < N3DS_DSP_DMA_BUFFER_COUNT; i++)
     {
         sDspVAddrs[i] = &bufferData[i * N3DS_DSP_DMA_BUFFER_SIZE];
@@ -285,8 +333,10 @@ static void audio_3ds_initialize_dsp()
 
 static bool audio_3ds_init()
 {
+    DBG_LOG("audio: init start");
     audio_3ds_initialize_dsp();
     audio_3ds_initialize_thread();
+    DBG_LOG("audio: init done cpu=%d thread5_does_audio=%d", s_audio_cpu, s_thread5_does_audio);
     return true;
 }
 
@@ -298,14 +348,16 @@ static void audio_3ds_stop(void)
     if (threadId)
         threadJoin(threadId, U64_MAX);
 
-    ndspExit();
+    if (s_dsp_ready)
+        ndspExit();
 }
 
 void audio_3ds_set_dsp_volume(float left, float right)
 {
     ndsp_mix.mix.main.volume_left = left;
     ndsp_mix.mix.main.volume_right = right;
-    ndspChnSetMix(0, ndsp_mix.raw);
+    if (s_dsp_ready)
+        ndspChnSetMix(0, ndsp_mix.raw);
 }
 
 struct AudioAPI audio_3ds =

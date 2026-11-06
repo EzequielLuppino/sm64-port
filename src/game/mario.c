@@ -7,6 +7,7 @@
 #include "behavior_actions.h"
 #include "behavior_data.h"
 #include "camera.h"
+#include "cheats.h"
 #include "engine/graph_node.h"
 #include "engine/math_util.h"
 #include "engine/surface_collision.h"
@@ -1474,7 +1475,7 @@ void update_mario_health(struct MarioState *m) {
                     // If using the debug level select, do not lose any HP to water.
                     if ((m->pos[1] >= (m->waterLevel - 140)) && !terrainIsSnow) {
                         m->health += 0x1A;
-                    } else if (gDebugLevelSelect == 0) {
+                    } else if (gDebugLevelSelect == 0 && !gCheats.infiniteAir) {
                         m->health -= (terrainIsSnow ? 3 : 1);
                     }
                 }
@@ -1709,6 +1710,7 @@ s32 execute_mario_action(UNUSED struct Object *o) {
 
     if (gMarioState->action) {
         gMarioState->marioObj->header.gfx.node.flags &= ~GRAPH_RENDER_INVISIBLE;
+        cheats_pre_mario_update(gMarioState);
         mario_reset_bodystate(gMarioState);
         update_mario_inputs(gMarioState);
         mario_handle_special_floors(gMarioState);
@@ -1758,6 +1760,7 @@ s32 execute_mario_action(UNUSED struct Object *o) {
         squish_mario_model(gMarioState);
         set_submerged_cam_preset_and_spawn_bubbles(gMarioState);
         update_mario_health(gMarioState);
+        cheats_post_mario_update(gMarioState);
         update_mario_info_for_cam(gMarioState);
         mario_update_hitbox_and_cap_model(gMarioState);
 

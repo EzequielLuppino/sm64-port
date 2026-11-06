@@ -1,7 +1,9 @@
 #include <stdio.h>
 #include <string.h>
+#include <errno.h>
 #include "lib/src/libultra_internal.h"
 #include "macros.h"
+#include "debug_log.h"
 
 #ifdef TARGET_WEB
 #include <emscripten.h>
@@ -118,6 +120,7 @@ s32 osAiSetFrequency(u32 freq) {
 }
 
 s32 osEepromProbe(UNUSED OSMesgQueue *mq) {
+    DBG_LOG("eeprom: probe -> 1");
     return 1;
 }
 
@@ -148,21 +151,25 @@ s32 osEepromLongRead(UNUSED OSMesgQueue *mq, u8 address, u8 *buffer, int nbytes)
 #else
     FILE *fp = fopen("sm64_save_file.bin", "rb");
     if (fp == NULL) {
+        DBG_LOG("eeprom read: addr=%u nbytes=%d fopen failed errno=%d", address, nbytes, errno);
         return -1;
     }
-    if (fread(content, 1, 512, fp) == 512) {
+    size_t got = fread(content, 1, 512, fp);
+    if (got == 512) {
         memcpy(buffer, content + address * 8, nbytes);
         ret = 0;
     }
     fclose(fp);
+    DBG_LOG("eeprom read: addr=%u nbytes=%d fread=%u ret=%d", address, nbytes, (unsigned) got, ret);
 #endif
     return ret;
 }
 
 s32 osEepromLongWrite(UNUSED OSMesgQueue *mq, u8 address, u8 *buffer, int nbytes) {
     u8 content[512] = {0};
+    s32 preRead = 0;
     if (address != 0 || nbytes != 512) {
-        osEepromLongRead(mq, 0, content, 512);
+        preRead = osEepromLongRead(mq, 0, content, 512);
     }
     memcpy(content + address * 8, buffer, nbytes);
 
@@ -178,10 +185,15 @@ s32 osEepromLongWrite(UNUSED OSMesgQueue *mq, u8 address, u8 *buffer, int nbytes
 #else
     FILE* fp = fopen("sm64_save_file.bin", "wb");
     if (fp == NULL) {
+        DBG_LOG("eeprom write: addr=%u nbytes=%d preRead=%d fopen failed errno=%d",
+                address, nbytes, preRead, errno);
         return -1;
     }
-    s32 ret = fwrite(content, 1, 512, fp) == 512 ? 0 : -1;
+    size_t written = fwrite(content, 1, 512, fp);
+    s32 ret = written == 512 ? 0 : -1;
     fclose(fp);
+    DBG_LOG("eeprom write: addr=%u nbytes=%d preRead=%d wrote=%u ret=%d",
+            address, nbytes, preRead, (unsigned) written, ret);
 #endif
     return ret;
 }

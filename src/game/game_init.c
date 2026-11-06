@@ -11,6 +11,7 @@
 #include "game_init.h"
 #include "main.h"
 #include "memory.h"
+#include "menu/file_select.h"
 #include "profiler.h"
 #include "save_file.h"
 #include "seq_ids.h"
@@ -19,6 +20,7 @@
 #include "segment2.h"
 #include "segment_symbols.h"
 #include "thread6.h"
+#include "debug_log.h"
 #include <prevent_bss_reordering.h>
 
 #ifdef TARGET_N3DS
@@ -529,6 +531,13 @@ void read_controller_inputs(void) {
     gPlayer3Controller->stickMag = gPlayer1Controller->stickMag;
     gPlayer3Controller->buttonPressed = gPlayer1Controller->buttonPressed;
     gPlayer3Controller->buttonDown = gPlayer1Controller->buttonDown;
+
+    if (gPlayer1Controller->buttonPressed != 0) {
+        DBG_LOG("input: pressed=0x%x down=0x%x stick=(%d,%d) mag=%d level=%d area=%d save=%d",
+                gPlayer1Controller->buttonPressed, gPlayer1Controller->buttonDown,
+                gPlayer1Controller->stickX, gPlayer1Controller->stickY,
+                gPlayer1Controller->stickMag, gCurrLevelNum, gCurrAreaIndex, gCurrSaveFileNum);
+    }
 }
 
 // initialize the controller structs to point at the OSCont information.
@@ -605,7 +614,9 @@ void thread5_game_loop(UNUSED void *arg) {
 #ifdef VERSION_SH
     create_thread_6();
 #endif
+    DBG_LOG("thread5: controllers bits=0x%x eepromProbe=%d", gControllerBits, gEepromProbe);
     save_file_load_all();
+    DBG_LOG("thread5: save load done, starting level script");
 
     set_vblank_handler(2, &gGameVblankHandler, &gGameVblankQueue, (OSMesg) 1);
 
@@ -650,6 +661,12 @@ void game_loop_one_iteration(void) {
 #endif
         config_gfx_pool();
         read_controller_inputs();
+
+        // The menus set this while their display lists are built below.
+        // Clearing it after input has been read means controller/touch input
+        // sees the previous frame's state, while the renderer (including the
+        // bottom-screen touchpad) sees the current frame's state.
+        gFileSelectCursorActive = FALSE;
 
         levelCommandAddr = level_script_execute(levelCommandAddr);
 

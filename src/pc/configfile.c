@@ -5,12 +5,14 @@
 #include <string.h>
 #include <assert.h>
 #include <ctype.h>
+#include <errno.h>
 
 #ifdef TARGET_N3DS
 #include "3ds.h"
 #endif
 
 #include "configfile.h"
+#include "debug_log.h"
 
 #define ARRAY_LEN(arr) (sizeof(arr) / sizeof(arr[0]))
 
@@ -187,9 +189,11 @@ void configfile_load(const char *filename) {
     if (file == NULL) {
         // Create a new config file and save defaults
         printf("Config file '%s' not found. Creating it.\n", filename);
+        DBG_LOG("configfile_load: '%s' not found (errno=%d), writing defaults", filename, errno);
         configfile_save(filename);
         return;
     }
+    DBG_LOG("configfile_load: opened '%s'", filename);
 
     // Go through each line in the file
     while ((line = read_file_line(file)) != NULL) {
@@ -238,6 +242,8 @@ void configfile_load(const char *filename) {
     }
 
     fclose(file);
+    DBG_LOG("configfile_load: done key_a=0x%x key_b=0x%x key_start=0x%x key_z=0x%x",
+            configKeyA, configKeyB, configKeyStart, configKeyZ);
 }
 
 // Writes the config file to 'filename'

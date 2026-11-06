@@ -120,12 +120,12 @@ static void clear_buffers()
 
     // Clear top screen
     if (clear_top)
-        C3D_RenderTargetClear(gTarget, (C3D_ClearBits) clear_top, screen_clear_colors.struc.top, 0xFFFFFFFF);
+        C3D_RenderTargetClear(gTarget, (C3D_ClearBits) clear_top, screen_clear_colors.struc.top, 0);
         
     // Clear right-eye view
     // We check gGfx3DSMode because clearing in 800px modes causes a crash.
     if (clear_top && (gGfx3DSMode == GFX_3DS_MODE_NORMAL || gGfx3DSMode == GFX_3DS_MODE_AA_22))
-        C3D_RenderTargetClear(gTargetRight, (C3D_ClearBits) clear_top, screen_clear_colors.struc.top, 0xFFFFFFFF);
+        C3D_RenderTargetClear(gTargetRight, (C3D_ClearBits) clear_top, screen_clear_colors.struc.top, 0);
 
     // Clear bottom screen only if it needs re-rendering.
     if (clear_bottom)
@@ -539,8 +539,8 @@ static void gfx_citro3d_set_sampler_parameters(int tile, bool linear_filter, uin
 
 static void update_depth()
 {
-    C3D_DepthTest(sDepthTestOn, GPU_LEQUAL, sDepthUpdateOn ? GPU_WRITE_ALL : GPU_WRITE_COLOR);
-    C3D_DepthMap(true, -1.0f, sDepthDecal ? -0.001f : 0);
+    C3D_DepthTest(sDepthTestOn, GPU_GREATER, sDepthUpdateOn ? GPU_WRITE_ALL : GPU_WRITE_COLOR);
+    C3D_DepthMap(true, -1.0f, sDepthDecal ? 0.001f : 0);
 }
 
 static void gfx_citro3d_set_depth_test(bool depth_test)
@@ -623,6 +623,15 @@ static void applyBlend()
 static void gfx_citro3d_set_use_alpha(bool use_alpha)
 {
     sUseBlend = use_alpha;
+    applyBlend();
+}
+
+// The bottom-screen menu draws directly through Citro3D, bypassing the state
+// cache kept by gfx_pc/gfx_citro3d. Re-apply the cached depth and blend state
+// so the next top-screen frame is not affected by the menu's settings.
+void gfx_citro3d_restore_top_screen_state(void)
+{
+    update_depth();
     applyBlend();
 }
 
@@ -855,7 +864,7 @@ static void gfx_citro3d_init(void)
 
     C3D_CullFace(GPU_CULL_NONE);
     C3D_DepthMap(true, -1.0f, 0);
-    C3D_DepthTest(false, GPU_LEQUAL, GPU_WRITE_ALL);
+    C3D_DepthTest(false, GPU_GREATER, GPU_WRITE_ALL);
     C3D_AlphaTest(true, GPU_GREATER, 0x00);
 
 #ifdef VERSION_EU
@@ -905,8 +914,11 @@ static void gfx_citro3d_on_resize(void)
 
 static void gfx_citro3d_end_frame(void)
 {
-    // TOOD: draw the minimap here
-    gfx_3ds_menu_draw(sVboBuffer, sBufIdx, gShowConfigMenu);
+    sBufIdx = gfx_3ds_bottom_screen_draw(sVboBuffer, sBufIdx);
+
+    // The bottom-screen menu changes GPU state directly; restore what the
+    // renderer's state cache expects before the next top-screen frame.
+    gfx_citro3d_restore_top_screen_state();
 
     // set the texenv back
     update_shader(false);

@@ -6,6 +6,7 @@
 #include "behavior_actions.h"
 #include "behavior_data.h"
 #include "camera.h"
+#include "cheats.h"
 #include "course_table.h"
 #include "dialog_ids.h"
 #include "engine/math_util.h"
@@ -1769,7 +1770,7 @@ void check_kick_or_punch_wall(struct MarioState *m) {
 
 void mario_process_interactions(struct MarioState *m) {
     sDelayInvincTimer = FALSE;
-    sInvulnerable = (m->action & ACT_FLAG_INVULNERABLE) || m->invincTimer != 0;
+    sInvulnerable = (m->action & ACT_FLAG_INVULNERABLE) || m->invincTimer != 0 || gCheats.noDamage;
 
     if (!(m->action & ACT_FLAG_INTANGIBLE) && m->collidedObjInteractTypes != 0) {
         s32 i;

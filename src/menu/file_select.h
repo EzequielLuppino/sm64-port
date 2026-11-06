@@ -133,6 +133,16 @@ enum SoundModeMenuActionPhase {
     SOUND_MODE_PHASE_MAIN
 };
 
+// True while the file-select cursor is being drawn (i.e. the menu is on
+// screen). The 3DS port uses this to turn the bottom screen into a touchpad
+// for the menu cursor instead of the MAP/CHEATS/SETUP interface.
+extern u8 gFileSelectCursorActive;
+
+#ifdef TARGET_N3DS
+void file_select_menu_touch_move(float x, float y);
+void file_select_menu_touch_click(void);
+#endif
+
 void beh_yellow_background_menu_init(void);
 void beh_yellow_background_menu_loop(void);
 void bhv_menu_button_init(void);

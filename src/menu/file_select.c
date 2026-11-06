@@ -20,6 +20,7 @@
 #include "game/spawn_object.h"
 #include "sm64.h"
 #include "text_strings.h"
+#include "debug_log.h"
 
 #include "eu_translation.h"
 #ifdef VERSION_EU
@@ -101,6 +102,10 @@ static f32 sCursorPos[] = {0, 0};
 
 // Determines which graphic to use for the cursor.
 static s16 sCursorClickingTimer = 0;
+
+// Set while the cursor geo node renders. Cleared once per frame in
+// game_loop_one_iteration so it only stays set while a menu is on screen.
+u8 gFileSelectCursorActive = FALSE;
 
 // Equal to sCursorPos if the cursor gets clicked, {-10000, -10000} otherwise.
 static s16 sClickPos[] = {-10000, -10000};
@@ -350,11 +355,13 @@ s32 check_clicked_button(s16 x, s16 y, f32 depth) {
     s16 minX = newX - 25.0f;
     s16 maxY = newY + 21.0f;
     s16 minY = newY - 21.0f;
+    s32 clicked = FALSE;
 
     if (sClickPos[0] < maxX && minX < sClickPos[0] && sClickPos[1] < maxY && minY < sClickPos[1]) {
-        return TRUE;
+        clicked = TRUE;
     }
-    return FALSE;
+
+    return clicked;
 }
 
 /**
@@ -1524,6 +1531,7 @@ void check_sound_mode_menu_clicked_buttons(struct Object *soundModeButton) {
 void load_main_menu_save_file(struct Object *fileButton, s32 fileNum) {
     if (fileButton->oMenuButtonState == MENU_BUTTON_STATE_FULLSCREEN) {
         sSelectedFileNum = fileNum;
+        DBG_LOG("file_select: load file=%d (button state FULLSCREEN)", fileNum);
 #ifdef TARGET_N3DS
         fileButton->oMenuButtonScale = fileButton->oMenuButtonScale * aspectScale;
 #endif
@@ -2054,12 +2062,48 @@ void handle_controller_cursor_input(void) {
     }
 }
 
+#ifdef TARGET_N3DS
+/**
+ * Moves the file-select cursor to a menu-space position.
+ * Called from the 3DS bottom-screen touch handler.
+ */
+void file_select_menu_touch_move(float x, float y) {
+    sCursorPos[0] = x;
+    sCursorPos[1] = y;
+
+    // Same bounds as handle_controller_cursor_input.
+    if (sCursorPos[0] > 160.0f) {
+        sCursorPos[0] = 160.0f;
+    }
+    if (sCursorPos[0] < -160.0f) {
+        sCursorPos[0] = -160.0f;
+    }
+    if (sCursorPos[1] > 90.0f) {
+        sCursorPos[1] = 90.0f;
+    }
+    if (sCursorPos[1] < -90.0f) {
+        sCursorPos[1] = -90.0f;
+    }
+}
+
+/**
+ * Clicks the file-select cursor at its current position.
+ * Called when the finger is lifted from the 3DS bottom screen.
+ */
+void file_select_menu_touch_click(void) {
+    sClickPos[0] = sCursorPos[0];
+    sClickPos[1] = sCursorPos[1];
+    sCursorClickingTimer = 1;
+}
+#endif
+
 /**
  * Prints the cursor (Mario Hand, different to the one in the Mario screen)
  * and loads it's controller inputs in handle_controller_cursor_input
  * to be usable on the file select.
  */
 void print_menu_cursor(void) {
+    gFileSelectCursorActive = TRUE;
     handle_controller_cursor_input();
     create_dl_translation_matrix(MENU_MTX_PUSH, sCursorPos[0] + 160.0f - 5.0, sCursorPos[1] + 120.0f - 25.0, 0.0f);
     // Get the right graphic to use for the cursor.
@@ -3253,6 +3297,10 @@ s32 lvl_init_menu_values_and_cursor_pos(UNUSED s32 arg, UNUSED s32 unused) {
     sMainMenuTimer = 0;
     sEraseYesNoHoverState = MENU_ERASE_HOVER_NONE;
     sSoundMode = save_file_get_sound_mode();
+    DBG_LOG("file_select: init currSave=%d cursor=(%.1f,%.1f) files=%d%d%d%d sound=%u",
+            gCurrSaveFileNum, sCursorPos[0], sCursorPos[1],
+            save_file_exists(SAVE_FILE_A), save_file_exists(SAVE_FILE_B),
+            save_file_exists(SAVE_FILE_C), save_file_exists(SAVE_FILE_D), sSoundMode);
 #ifdef VERSION_EU
     sLanguageMode = eu_get_language();
 

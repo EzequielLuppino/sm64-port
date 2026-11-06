@@ -3,6 +3,7 @@
 #include "sm64.h"
 #include "behavior_data.h"
 #include "behavior_script.h"
+#include "cheats.h"
 #include "game/area.h"
 #include "game/behavior_actions.h"
 #include "game/game_init.h"
@@ -922,6 +923,17 @@ void cur_obj_update(void) {
     // Calculate the angle from the object to Mario.
     if (objFlags & OBJ_FLAG_COMPUTE_ANGLE_TO_MARIO) {
         gCurrentObject->oAngleToMario = obj_angle_to_object(gCurrentObject, gMarioObject);
+    }
+
+    // Cheat: make objects believe Mario is far away and behind them so that
+    // enemies do not notice or chase him.
+    if (gCheats.enemiesIgnore) {
+        if (objFlags & OBJ_FLAG_COMPUTE_DIST_TO_MARIO) {
+            gCurrentObject->oDistanceToMario = 19000.0f;
+        }
+        if (objFlags & OBJ_FLAG_COMPUTE_ANGLE_TO_MARIO) {
+            gCurrentObject->oAngleToMario = (s16) (gCurrentObject->oMoveAngleYaw + 0x8000);
+        }
     }
 
     // If the object's action has changed, reset the action timer.

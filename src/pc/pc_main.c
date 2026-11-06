@@ -33,6 +33,7 @@
 #include "configfile.h"
 
 #include "compat.h"
+#include "debug_log.h"
 
 #define CONFIG_FILE "sm64config.txt"
 
@@ -140,10 +141,14 @@ static void on_fullscreen_changed(bool is_now_fullscreen) {
 
 void main_func(void) {
     static u8 pool[DOUBLE_SIZE_ON_64_BIT(0x165000)] __attribute__ ((aligned(16)));
+    DBG_LOG_INIT();
+    DBG_LOG("main_func: start");
     main_pool_init(pool, pool + sizeof(pool));
     gEffectsMemoryPool = mem_pool_init(0x4000, MEMORY_POOL_LEFT);
 
     configfile_load(CONFIG_FILE);
+    DBG_LOG("main_func: config loaded key_a=0x%x key_b=0x%x key_start=0x%x",
+            configKeyA, configKeyB, configKeyStart);
     atexit(save_config);
 
 #ifdef TARGET_WEB
@@ -214,7 +219,9 @@ void main_func(void) {
 #elif defined(TARGET_N3DS)
     inited = 1;
     //the 3ds version has its own main loop
+    DBG_LOG("main_func: entering 3DS main loop");
     wm_api->main_loop(produce_one_frame);
+    DBG_LOG("main_func: 3DS main loop returned");
     audio_api->stop();
 #else
     inited = 1;

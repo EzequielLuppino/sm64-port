@@ -509,6 +509,9 @@ ifeq ($(TARGET_N3DS),1)
   ifeq ($(DISABLE_AUDIO),1)
     PLATFORM_CFLAGS += -DDISABLE_AUDIO
   endif
+  ifeq ($(DEBUG_LOG),1)
+    PLATFORM_CFLAGS += -DENABLE_DEBUG_LOG
+  endif
   ifeq ($(ENABLE_N3DS_FRAMESKIP),1)
     PLATFORM_CFLAGS += -DENABLE_N3DS_FRAMESKIP
   endif
@@ -923,8 +926,17 @@ SMDH_DESCRIPTION ?= Super Mario 64 3DS Port
 SMDH_AUTHOR ?= mkst
 SMDH_ICON := 3ds/icon.smdh
 
-$(ELF): $(O_FILES) $(MIO0_FILES:.mio0=.o) $(SOUND_OBJ_FILES) $(ULTRA_O_FILES) $(GODDARD_O_FILES) $(BUILD_DIR)/src/pc/gfx/shader.shbin.o $(SMDH_ICON)
-	$(LD) -L $(BUILD_DIR) -o $@ $(O_FILES) $(BUILD_DIR)/src/pc/gfx/shader.shbin.o $(MINIMAP_T3X_O) $(SOUND_OBJ_FILES) $(ULTRA_O_FILES) $(GODDARD_O_FILES) $(LDFLAGS)
+# OpenDSP: open-source replacement for the DSP firmware (BSD-2-Clause).
+# Embedded so audio works without /3ds/dspfirm.cdc or hb:ndsp.
+OPENDSP_FIRMWARE := 3ds/opendsp.cdc
+OPENDSP_O := $(BUILD_DIR)/src/pc/audio/opendsp_firmware.o
+
+$(OPENDSP_O): $(OPENDSP_FIRMWARE)
+	@mkdir -p $(dir $@)
+	$(DEVKITPRO)/tools/bin/bin2s -a 4 $< | $(AS) -o $@
+
+$(ELF): $(O_FILES) $(MINIMAP_O) $(MIO0_FILES:.mio0=.o) $(SOUND_OBJ_FILES) $(ULTRA_O_FILES) $(GODDARD_O_FILES) $(BUILD_DIR)/src/pc/gfx/shader.shbin.o $(OPENDSP_O) $(SMDH_ICON)
+	$(LD) -L $(BUILD_DIR) -o $@ $(O_FILES) $(MINIMAP_O) $(BUILD_DIR)/src/pc/gfx/shader.shbin.o $(OPENDSP_O) $(MINIMAP_T3X_O) $(SOUND_OBJ_FILES) $(ULTRA_O_FILES) $(GODDARD_O_FILES) $(LDFLAGS)
 
 $(EXE): $(ELF)
 	3dsxtool $< $@ --smdh=$(BUILD_DIR)/$(SMDH_ICON)
@@ -935,22 +947,24 @@ $(CIA): $(ELF)
 
 # stolen from /opt/devkitpro/devkitARM/base_tools
 define bin2o
-  bin2s -a 4 -H $(BUILD_DIR)/$(MINIMAP_TEXTURES)/`(echo $(<F) | tr . _)`.h $(BUILD_DIR)/$< | $(AS) -o $(BUILD_DIR)/$(MINIMAP_TEXTURES)/$(<F).o
+  bin2s -a 4 -H $(BUILD_DIR)/$(MINIMAP_TEXTURES)/$(subst .,_,$(<F)).h $< | $(AS) -o $(BUILD_DIR)/$(MINIMAP_TEXTURES)/$(<F).o
 endef
 
 # TODO: simplify dependency chain
 $(BUILD_DIR)/src/pc/gfx/gfx_citro3d.o: $(BUILD_DIR)/src/pc/gfx/gfx_3ds.o
 $(BUILD_DIR)/src/pc/gfx/gfx_3ds.o: $(BUILD_DIR)/src/pc/gfx/gfx_3ds_menu.o
 $(BUILD_DIR)/src/pc/gfx/gfx_3ds_menu.o: $(MINIMAP_T3X_HEADERS)
+$(BUILD_DIR)/src/pc/gfx/gfx_3ds_minimap.o: $(MINIMAP_T3X_HEADERS) $(BUILD_DIR)/src/pc/gfx/gfx_3ds_menu.o
+$(MINIMAP_O): $(MINIMAP_T3X_HEADERS)
 
-%.t3x.o $(BUILD_DIR)/%_t3x.h: %.t3x
+$(BUILD_DIR)/%.t3x.o $(BUILD_DIR)/%_t3x.h: $(BUILD_DIR)/%.t3x
 	$(bin2o)
 
-%.t3x: %.t3s
-	tex3ds -i $(BUILD_DIR)/$< -o $(BUILD_DIR)/$@
+$(BUILD_DIR)/$(MINIMAP_TEXTURES)/%.t3x: $(BUILD_DIR)/$(MINIMAP_TEXTURES)/%.t3s
+	tex3ds -i $< -o $@
 
-%.t3s: %.png
-	@printf -- "-f rgba -z auto\n../../../../../$(<)\n" > $(BUILD_DIR)/$@
+$(BUILD_DIR)/$(MINIMAP_TEXTURES)/%.t3s: $(MINIMAP_TEXTURES)/%.png
+	@printf -- "-f rgba -z auto\n$(abspath $<)\n" > $@
 
 %.smdh: %.png
 	smdhtool --create "$(SMDH_TITLE)" "$(SMDH_DESCRIPTION)" "$(SMDH_AUTHOR)" $< $(BUILD_DIR)/$@

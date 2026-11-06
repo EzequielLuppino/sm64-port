@@ -48,6 +48,7 @@
 *.cia
 *.cxi
 *.3dsx
+*.3ds
 
 # datadump
 /tools/ddump/*
@@ -61,6 +62,7 @@
 __pycache__/*
 doxygen/doxygen/*
 build/*
+build_*/
 *.dump
 *.mio0
 *.z64

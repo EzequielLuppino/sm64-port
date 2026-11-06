@@ -34,6 +34,9 @@
 #include <math.h>
 
 #include "controller_api.h"
+#include "cheats.h"
+#include "debug_log.h"
+#include "menu/file_select.h"
 
 #include "../configfile.h"
 
@@ -45,17 +48,15 @@ static void set_button_mapping(int index, int mask_n64, int mask_3ds)
     button_mapping[index][1] = mask_n64;
 }
 
-// From gfx_3ds_menu
-static bool is_inside_box(int pos_x, int pos_y, int x, int y, int width, int height)
-{
-    return pos_x >= x && pos_x <= (x+width) && pos_y >= y && pos_y <= (y+height);
-}
-
 static u32 controller_3ds_get_held(void)
 {
     u32 res = 0;
     hidScanInput();
     u32 kDown = keysHeld();
+
+    // Moon jump cheat: ZR is not mapped to an N64 button, read it directly.
+    gCheatMoonJumpHeld = (kDown & KEY_ZR) != 0;
+
     for (size_t i = 0; i < sizeof(button_mapping) / sizeof(button_mapping[0]); i++)
     {
         if (button_mapping[i][0] & kDown) {
@@ -63,24 +64,14 @@ static u32 controller_3ds_get_held(void)
         }
     }
 
-    touchPosition pos;
-    hidTouchRead(&pos);
-
-    if (is_inside_box(pos.px, pos.py, 170, 122, 64, 64))
-        res |= L_CBUTTONS;
-    if (is_inside_box(pos.px, pos.py, 245, 122, 64, 64))
-        res |= R_CBUTTONS;
-    if (is_inside_box(pos.px, pos.py, 207, 197, 64, 32))
-        res |= D_CBUTTONS;
-    if (is_inside_box(pos.px, pos.py, 207, 79, 64, 32))
-        res |= U_CBUTTONS;
-
     return res;
 }
 
 static void controller_3ds_init(void)
 {
     u32 i = 0;
+    DBG_LOG("3ds controller init: key_a=0x%x key_b=0x%x key_start=0x%x key_z=0x%x",
+            configKeyA, configKeyB, configKeyStart, configKeyZ);
     set_button_mapping(i++, A_BUTTON,     configKeyA); // n64 button => configured button
     set_button_mapping(i++, B_BUTTON,     configKeyB);
     set_button_mapping(i++, START_BUTTON, configKeyStart);
@@ -105,6 +96,24 @@ static void controller_3ds_read(OSContPad *pad)
     hidCircleRead(&pos);
     pad->stick_x = pos.dx / 2;
     pad->stick_y = pos.dy / 2;
+
+    // In the file-select menus the D-pad nudges the cursor precisely.
+    // (24 raw units -> 3 pixels per frame in handle_controller_cursor_input.)
+    // Uses the raw HID bits because the D-pad keys are unmapped by default.
+    if (gFileSelectCursorActive) {
+        u32 dpad = keysHeld();
+
+        if (dpad & KEY_DRIGHT) {
+            pad->stick_x = 24;
+        } else if (dpad & KEY_DLEFT) {
+            pad->stick_x = -24;
+        }
+        if (dpad & KEY_DUP) {
+            pad->stick_y = 24;
+        } else if (dpad & KEY_DDOWN) {
+            pad->stick_y = -24;
+        }
+    }
 }
 
 struct ControllerAPI controller_3ds = {

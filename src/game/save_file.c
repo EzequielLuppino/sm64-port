@@ -11,6 +11,7 @@
 #include "level_table.h"
 #include "course_table.h"
 #include "thread6.h"
+#include "debug_log.h"
 
 #define MENU_DATA_MAGIC 0x4849
 #define SAVE_FILE_MAGIC 0x4441
@@ -58,10 +59,11 @@ static void stub_save_file_1(void) {
  */
 static s32 read_eeprom_data(void *buffer, s32 size) {
     s32 status = 0;
+    u32 offset = 0;
 
     if (gEepromProbe != 0) {
         s32 triesLeft = 4;
-        u32 offset = (u32)((u8 *) buffer - (u8 *) &gSaveBuffer) / 8;
+        offset = (u32)((u8 *) buffer - (u8 *) &gSaveBuffer) / 8;
 
         do {
 #ifdef VERSION_SH
@@ -75,6 +77,7 @@ static s32 read_eeprom_data(void *buffer, s32 size) {
         } while (triesLeft > 0 && status != 0);
     }
 
+    DBG_LOG("save: read offset=%u size=%d status=%d", offset, size, status);
     return status;
 }
 
@@ -86,10 +89,11 @@ static s32 read_eeprom_data(void *buffer, s32 size) {
  */
 static s32 write_eeprom_data(void *buffer, s32 size) {
     s32 status = 1;
+    u32 offset = 0;
 
     if (gEepromProbe != 0) {
         s32 triesLeft = 4;
-        u32 offset = (u32)((u8 *) buffer - (u8 *) &gSaveBuffer) >> 3;
+        offset = (u32)((u8 *) buffer - (u8 *) &gSaveBuffer) >> 3;
 
         do {
 #ifdef VERSION_SH
@@ -103,6 +107,7 @@ static s32 write_eeprom_data(void *buffer, s32 size) {
         } while (triesLeft > 0 && status != 0);
     }
 
+    DBG_LOG("save: write offset=%u size=%d status=%d", offset, size, status);
     return status;
 }
 
@@ -161,6 +166,7 @@ static void restore_main_menu_data(s32 srcSlot) {
 }
 
 static void save_main_menu_data(void) {
+    DBG_LOG("save_menu: modified=%d", gMainMenuDataModified);
     if (gMainMenuDataModified) {
         // Compute checksum
         add_save_block_signature(&gSaveBuffer.menuData[0], sizeof(gSaveBuffer.menuData[0]), MENU_DATA_MAGIC);
@@ -176,6 +182,7 @@ static void save_main_menu_data(void) {
 }
 
 static void wipe_main_menu_data(void) {
+    DBG_LOG("save_menu: wipe (no valid menu data)");
     bzero(&gSaveBuffer.menuData[0], sizeof(gSaveBuffer.menuData[0]));
 
     // Set score ages for all courses to 3, 2, 1, and 0, respectively.
@@ -250,6 +257,8 @@ static void restore_save_file_data(s32 fileIndex, s32 srcSlot) {
 }
 
 void save_file_do_save(s32 fileIndex) {
+    DBG_LOG("save_do: begin file=%d modified=%d flags=0x%08x", fileIndex, gSaveFileModified,
+            gSaveBuffer.files[fileIndex][0].flags);
     if (gSaveFileModified) {
         // Compute checksum
         add_save_block_signature(&gSaveBuffer.files[fileIndex][0],
@@ -266,9 +275,11 @@ void save_file_do_save(s32 fileIndex) {
     }
 
     save_main_menu_data();
+    DBG_LOG("save_do: end file=%d flags=0x%08x", fileIndex, gSaveBuffer.files[fileIndex][0].flags);
 }
 
 void save_file_erase(s32 fileIndex) {
+    DBG_LOG("save_erase: file=%d flags_before=0x%08x", fileIndex, gSaveBuffer.files[fileIndex][0].flags);
     touch_high_score_ages(fileIndex);
     bzero(&gSaveBuffer.files[fileIndex][0], sizeof(gSaveBuffer.files[fileIndex][0]));
 
@@ -292,15 +303,18 @@ void save_file_load_all(void) {
     s32 file;
     s32 validSlots;
 
+    DBG_LOG("save_load: begin");
     gMainMenuDataModified = FALSE;
     gSaveFileModified = FALSE;
 
     bzero(&gSaveBuffer, sizeof(gSaveBuffer));
     read_eeprom_data(&gSaveBuffer, sizeof(gSaveBuffer));
+    DBG_LOG("save_load: eeprom read complete");
 
     // Verify the main menu data and create a backup copy if only one of the slots is valid.
     validSlots = verify_save_block_signature(&gSaveBuffer.menuData[0], sizeof(gSaveBuffer.menuData[0]), MENU_DATA_MAGIC);
     validSlots |= verify_save_block_signature(&gSaveBuffer.menuData[1], sizeof(gSaveBuffer.menuData[1]),MENU_DATA_MAGIC) << 1;
+    DBG_LOG("save_load: menu validSlots=%d soundMode=%u", validSlots, gSaveBuffer.menuData[0].soundMode);
     switch (validSlots) {
         case 0: // Neither copy is correct
             wipe_main_menu_data();
@@ -328,8 +342,12 @@ void save_file_load_all(void) {
                 restore_save_file_data(file, 1);
                 break;
         }
+        DBG_LOG("save_load: file=%d validSlots=%d flags=0x%08x exists=%d", file, validSlots,
+                gSaveBuffer.files[file][0].flags,
+                (gSaveBuffer.files[file][0].flags & SAVE_FLAG_FILE_EXISTS) != 0);
     }
 
+    DBG_LOG("save_load: done");
     stub_save_file_1();
 }
 
@@ -464,6 +482,8 @@ s32 save_file_get_total_star_count(s32 fileIndex, s32 minCourse, s32 maxCourse) 
 }
 
 void save_file_set_flags(u32 flags) {
+    DBG_LOG("save_set_flags: file=%d flags=0x%x old=0x%08x", gCurrSaveFileNum,
+            flags, gSaveBuffer.files[gCurrSaveFileNum - 1][0].flags);
     gSaveBuffer.files[gCurrSaveFileNum - 1][0].flags |= (flags | SAVE_FLAG_FILE_EXISTS);
     gSaveFileModified = TRUE;
 }
@@ -502,6 +522,7 @@ u32 save_file_get_star_flags(s32 fileIndex, s32 courseIndex) {
  * If course is -1, add to the bitset of obtained castle secret stars.
  */
 void save_file_set_star_flags(s32 fileIndex, s32 courseIndex, u32 starFlags) {
+    DBG_LOG("save_set_star: file=%d course=%d starFlags=0x%x", fileIndex, courseIndex, starFlags);
     if (courseIndex == -1) {
         gSaveBuffer.files[fileIndex][0].flags |= starFlags << 24;
     } else {

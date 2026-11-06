@@ -13,6 +13,7 @@
 #include "level_table.h"
 #include "seq_ids.h"
 #include "sm64.h"
+#include "debug_log.h"
 
 #if defined TARGET_N3DS && !defined DISABLE_AUDIO
     #include "src/pc/audio/audio_3ds_threading.h"
@@ -162,6 +163,7 @@ int intro_default(void) {
         sp1C = 100 + gDebugLevelSelect;
         D_U_801A7C34 = 1;
 #endif
+        DBG_LOG("title: START pressed, ret=100 debugLevel=%d", gDebugLevelSelect);
     }
     return run_press_start_demo_timer(sp1C);
 }
@@ -195,7 +197,8 @@ int intro_play_its_a_me_mario(void) {
 }
 
 s32 lvl_intro_update(s16 arg1, UNUSED s32 arg2) {
-    s32 retVar;
+    static s16 dbgLastArg1 = -1;
+    s32 retVar = 0;
 
     switch (arg1) {
         case 0:
@@ -215,6 +218,11 @@ s32 lvl_intro_update(s16 arg1, UNUSED s32 arg2) {
 #if defined TARGET_N3DS && !defined DISABLE_AUDIO
     s_thread5_wait_for_audio_to_finish = retVar == 0 ? true : false;
 #endif
+
+    if (arg1 != dbgLastArg1 || retVar != 0) {
+        DBG_LOG("intro_update: arg=%d ret=%d", arg1, retVar);
+        dbgLastArg1 = arg1;
+    }
 
     return retVar;
 }
