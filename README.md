@@ -18,11 +18,21 @@ A prior copy of the game is required to extract the assets.
  - Configurable controls via `sm64config.txt`
      - See [3DS_CONTROLLER_REMAPPING.md](3DS_CONTROLLER_REMAPPING.md).
  - GFX_POOL_SIZE [fix](https://github.com/aboood40091/sm64-port/commit/6ae4f4687ed234291ac1e572b75d65191ca9f364) (support 60 FPS on 32bit platforms)
- - Mini-menu (tap touch-screen to trigger)
-     - Enable/disable AA
-     - Enable/disable 800px mode
-     - Exit the game
- - Touch-screen camera controls similar to SM64DS
+ - Bottom-screen tabbed menu (tap the touch screen to open)
+     - **MAP**: touch-screen minimap and camera controls similar to SM64DS
+     - **CHEATS**: toggleable cheats (see below)
+     - **SETUP**: enable/disable AA, switch between 400px and 800px modes, exit the game
+     - **STATES**: 3 savestate slots with on-screen Save/Load buttons
+ - Cheats (CHEATS tab)
+     - Moon Jump (hold the 3DS A button while enabled; read directly from the hardware button, not affected by controller remapping)
+     - Infinite health, air, and lives; no damage; enemies ignore Mario
+     - Power-up override: Wing / Metal / Vanish cap
+ - Savestates (STATES tab)
+     - 3 slots, each holding the complete game state (writable globals plus the main memory pool)
+     - Slots are mirrored to `sdmc:/sm64state0.bin` – `sdmc:/sm64state2.bin`, so they survive closing and reopening the game
+     - On load, files are validated against the running build (format version, memory layout, CRC32); a savestate written by a different build is ignored and the slot shows as empty
+     - Saving pauses the game for a moment while the slot is written to the SD card
+     - A diagnostic log is kept at `sdmc:/sm64_savestate.log`
  - Support injection of [SMDH](https://www.3dbrew.org/wiki/SMDH) file into the .3dsx
      - Change the `3ds/icon.png` in the base of this repository before building.
  - To change the CIA banner, modify the `3ds/icon.png` and `3ds/banner.png` and use [bannertool](https://github.com/Steveice10/bannertool/releases/tag/1.2.0) to generate new `icon.icn` and `banner.bnr` respectively.

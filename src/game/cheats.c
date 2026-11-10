@@ -68,7 +68,7 @@ void cheats_post_mario_update(struct MarioState *m) {
     }
     sForcedCapFlags = desiredCapFlags;
 
-    // Moon jump: hold ZR to float upwards, including straight off the ground.
+    // Moon jump: hold A to float upwards, including straight off the ground.
     if (gCheats.moonJump && gCheatMoonJumpHeld) {
         u32 group = m->action & ACT_GROUP_MASK;
 

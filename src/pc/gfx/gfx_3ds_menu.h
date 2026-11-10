@@ -15,6 +15,7 @@
 #include "src/minimap/textures/tab_map_t3x.h"
 #include "src/minimap/textures/tab_cheats_t3x.h"
 #include "src/minimap/textures/tab_setup_t3x.h"
+#include "src/minimap/textures/tab_states_t3x.h"
 #include "src/minimap/textures/lbl_inf_health_t3x.h"
 #include "src/minimap/textures/lbl_inf_air_t3x.h"
 #include "src/minimap/textures/lbl_inf_lives_t3x.h"
@@ -27,6 +28,11 @@
 #include "src/minimap/textures/lbl_power_vanish_t3x.h"
 #include "src/minimap/textures/lbl_on_t3x.h"
 #include "src/minimap/textures/lbl_off_t3x.h"
+#include "src/minimap/textures/lbl_slot1_t3x.h"
+#include "src/minimap/textures/lbl_slot2_t3x.h"
+#include "src/minimap/textures/lbl_slot3_t3x.h"
+#include "src/minimap/textures/lbl_save_t3x.h"
+#include "src/minimap/textures/lbl_load_t3x.h"
 
 struct gfx_configuration
 {
@@ -45,7 +51,8 @@ typedef enum {
 typedef enum {
     BOTTOM_TAB_MAP = 0,
     BOTTOM_TAB_CHEATS = 1,
-    BOTTOM_TAB_SETUP = 2
+    BOTTOM_TAB_SETUP = 2,
+    BOTTOM_TAB_STATES = 3
 } bottom_tab;
 
 extern bottom_tab gBottomScreenTab;

@@ -93,6 +93,7 @@ def main():
     make_texture('tab_map', 128, 32, 'MAP', scale=3)
     make_texture('tab_cheats', 128, 32, 'CHEATS', scale=3)
     make_texture('tab_setup', 128, 32, 'SETUP', scale=3)
+    make_texture('tab_states', 128, 32, 'STATES', scale=3)
 
     # Cheat row labels (256x16 canvas, left aligned)
     labels = [
@@ -100,7 +101,7 @@ def main():
         ('lbl_inf_air', 'INF AIR'),
         ('lbl_inf_lives', 'INF LIVES'),
         ('lbl_no_damage', 'NO DAMAGE'),
-        ('lbl_moon_jump', 'MOON JUMP (ZR)'),
+        ('lbl_moon_jump', 'MOON JUMP (A)'),
         ('lbl_enemies_ignore', 'ENEMIES IGNORE'),
         ('lbl_power_none', 'POWER-UP: NONE'),
         ('lbl_power_wing', 'POWER-UP: WING'),
@@ -113,6 +114,12 @@ def main():
     # ON / OFF indicators (64x16 canvas)
     make_texture('lbl_on', 64, 16, 'ON')
     make_texture('lbl_off', 64, 16, 'OFF')
+
+    # Savestate slot labels (128x16 canvas, left aligned) and buttons.
+    for slot in range(1, 4):
+        make_texture('lbl_slot%d' % slot, 128, 16, 'SLOT %d' % slot, x=8, y=1)
+    make_texture('lbl_save', 64, 16, 'SAVE')
+    make_texture('lbl_load', 64, 16, 'LOAD')
 
 
 if __name__ == '__main__':

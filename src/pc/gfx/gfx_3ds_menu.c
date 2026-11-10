@@ -10,6 +10,7 @@
 
 #include "cheats.h"
 #include "menu/file_select.h"
+#include "pc/savestate_3ds.h"
 
 struct gfx_configuration gfx_config = {false, false}; // AA off, 800px off
 
@@ -26,11 +27,13 @@ static C3D_Tex mode_400_tex, mode_800_tex;
 static C3D_Tex aa_off_tex, aa_on_tex;
 static C3D_Tex resume_tex, exit_tex;
 
-static C3D_Tex tab_tex[3];
+static C3D_Tex tab_tex[4];
 static C3D_Tex lbl_inf_health_tex, lbl_inf_air_tex, lbl_inf_lives_tex, lbl_no_damage_tex;
 static C3D_Tex lbl_moon_jump_tex, lbl_enemies_ignore_tex;
 static C3D_Tex lbl_power_none_tex, lbl_power_wing_tex, lbl_power_metal_tex, lbl_power_vanish_tex;
 static C3D_Tex lbl_on_tex, lbl_off_tex;
+static C3D_Tex lbl_slot1_tex, lbl_slot2_tex, lbl_slot3_tex;
+static C3D_Tex lbl_save_tex, lbl_load_tex;
 
 // Colors (0xRRGGBB)
 #define COLOR_BACKGROUND   0x0B1118
@@ -38,12 +41,14 @@ static C3D_Tex lbl_on_tex, lbl_off_tex;
 #define COLOR_TAB_INACTIVE 0x2C3440
 #define COLOR_ROW_ON       0x2E7D32
 #define COLOR_ROW_OFF      0x232B36
+#define COLOR_SAVE_BUTTON  0x1B5E20
+#define COLOR_LOAD_EMPTY   0x151A21
 
 // Layout (touch coordinates: origin top-left, y grows downward)
-#define TAB_COUNT 3
-static const float sTabX[TAB_COUNT] = { 2.0f, 108.0f, 214.0f };
+#define TAB_COUNT 4
+static const float sTabX[TAB_COUNT] = { 2.0f, 82.0f, 162.0f, 242.0f };
 static const float sTabY = 2.0f;
-static const float sTabW = 102.0f;
+static const float sTabW = 76.0f;
 static const float sTabH = 26.0f;
 
 #define CHEAT_ROW_COUNT 7
@@ -52,6 +57,21 @@ static const float sCheatRowY = 30.0f;
 static const float sCheatRowW = 304.0f;
 static const float sCheatRowH = 26.0f;
 static const float sCheatRowPitch = 28.0f;
+
+#define STATE_ROW_COUNT 3
+static const float sStateRowX = 8.0f;
+static const float sStateRowY = 40.0f;
+static const float sStateRowW = 304.0f;
+static const float sStateRowH = 34.0f;
+static const float sStateRowPitch = 52.0f;
+static const float sStateLabelX = 8.0f;
+static const float sStateLabelY = 9.0f;
+static const float sStateLabelW = 128.0f;
+static const float sStateLabelH = 16.0f;
+static const float sStateSaveX = 152.0f;
+static const float sStateLoadX = 224.0f;
+static const float sStateButtonW = 64.0f;
+static const float sStateButtonH = 16.0f;
 
 static const float sSetupColX[2] = { 76.0f, 180.0f };
 static const float sSetupRowY[2] = { 50.0f, 150.0f };
@@ -192,6 +212,38 @@ static void gfx_3ds_menu_draw_cheats(float *vbo_buffer)
     }
 }
 
+static void gfx_3ds_menu_draw_states(float *vbo_buffer)
+{
+    C3D_Tex *labels[STATE_ROW_COUNT] = { &lbl_slot1_tex, &lbl_slot2_tex, &lbl_slot3_tex };
+    int i;
+
+    for (i = 0; i < STATE_ROW_COUNT; i++)
+    {
+        bool used = savestate_3ds_slot_used(i);
+        float y = sStateRowY + (sStateRowPitch * i);
+
+        gfx_3ds_menu_draw_rect(vbo_buffer, sStateRowX, y, sStateRowW, sStateRowH,
+                               gfx_3ds_rgb_to_abgr(used ? COLOR_ROW_ON : COLOR_ROW_OFF));
+        gfx_3ds_menu_draw_texture(vbo_buffer, labels[i],
+                                  sStateRowX + sStateLabelX, y + sStateLabelY,
+                                  sStateLabelW, sStateLabelH);
+
+        gfx_3ds_menu_draw_rect(vbo_buffer, sStateRowX + sStateSaveX, y + sStateLabelY,
+                               sStateButtonW, sStateButtonH,
+                               gfx_3ds_rgb_to_abgr(COLOR_SAVE_BUTTON));
+        gfx_3ds_menu_draw_texture(vbo_buffer, &lbl_save_tex,
+                                  sStateRowX + sStateSaveX, y + sStateLabelY,
+                                  sStateButtonW, sStateButtonH);
+
+        gfx_3ds_menu_draw_rect(vbo_buffer, sStateRowX + sStateLoadX, y + sStateLabelY,
+                               sStateButtonW, sStateButtonH,
+                               gfx_3ds_rgb_to_abgr(used ? COLOR_SAVE_BUTTON : COLOR_LOAD_EMPTY));
+        gfx_3ds_menu_draw_texture(vbo_buffer, &lbl_load_tex,
+                                  sStateRowX + sStateLoadX, y + sStateLabelY,
+                                  sStateButtonW, sStateButtonH);
+    }
+}
+
 static void gfx_3ds_menu_draw_setup(float *vbo_buffer)
 {
     gfx_3ds_menu_draw_texture(vbo_buffer, gfx_config.useAA ? &aa_on_tex : &aa_off_tex,
@@ -290,6 +342,33 @@ menu_action gfx_3ds_menu_on_touch(int touch_x, int touch_y)
             break;
         }
 
+        case BOTTOM_TAB_STATES:
+        {
+            for (i = 0; i < STATE_ROW_COUNT; i++)
+            {
+                int row_y = (int) (sStateRowY + (sStateRowPitch * i));
+
+                if (is_inside_box(touch_x, touch_y,
+                                  (int) (sStateRowX + sStateSaveX),
+                                  row_y + (int) sStateLabelY,
+                                  (int) sStateButtonW, (int) sStateButtonH))
+                {
+                    savestate_3ds_save(i);
+                    return DO_NOTHING;
+                }
+
+                if (is_inside_box(touch_x, touch_y,
+                                  (int) (sStateRowX + sStateLoadX),
+                                  row_y + (int) sStateLabelY,
+                                  (int) sStateButtonW, (int) sStateButtonH))
+                {
+                    savestate_3ds_load(i);
+                    return DO_NOTHING;
+                }
+            }
+            break;
+        }
+
         case BOTTOM_TAB_SETUP:
         {
             // toggle anti-aliasing (not available in 400px mode or 3D mode)
@@ -370,6 +449,8 @@ void gfx_3ds_menu_init()
     C3D_TexSetFilter(&tab_tex[1], GPU_LINEAR, GPU_NEAREST);
     load_t3x_texture(&tab_tex[2], NULL, tab_setup_t3x, tab_setup_t3x_size);
     C3D_TexSetFilter(&tab_tex[2], GPU_LINEAR, GPU_NEAREST);
+    load_t3x_texture(&tab_tex[3], NULL, tab_states_t3x, tab_states_t3x_size);
+    C3D_TexSetFilter(&tab_tex[3], GPU_LINEAR, GPU_NEAREST);
 
     load_t3x_texture(&lbl_inf_health_tex, NULL, lbl_inf_health_t3x, lbl_inf_health_t3x_size);
     C3D_TexSetFilter(&lbl_inf_health_tex, GPU_LINEAR, GPU_NEAREST);
@@ -395,6 +476,16 @@ void gfx_3ds_menu_init()
     C3D_TexSetFilter(&lbl_on_tex, GPU_LINEAR, GPU_NEAREST);
     load_t3x_texture(&lbl_off_tex, NULL, lbl_off_t3x, lbl_off_t3x_size);
     C3D_TexSetFilter(&lbl_off_tex, GPU_LINEAR, GPU_NEAREST);
+    load_t3x_texture(&lbl_slot1_tex, NULL, lbl_slot1_t3x, lbl_slot1_t3x_size);
+    C3D_TexSetFilter(&lbl_slot1_tex, GPU_LINEAR, GPU_NEAREST);
+    load_t3x_texture(&lbl_slot2_tex, NULL, lbl_slot2_t3x, lbl_slot2_t3x_size);
+    C3D_TexSetFilter(&lbl_slot2_tex, GPU_LINEAR, GPU_NEAREST);
+    load_t3x_texture(&lbl_slot3_tex, NULL, lbl_slot3_t3x, lbl_slot3_t3x_size);
+    C3D_TexSetFilter(&lbl_slot3_tex, GPU_LINEAR, GPU_NEAREST);
+    load_t3x_texture(&lbl_save_tex, NULL, lbl_save_t3x, lbl_save_t3x_size);
+    C3D_TexSetFilter(&lbl_save_tex, GPU_LINEAR, GPU_NEAREST);
+    load_t3x_texture(&lbl_load_tex, NULL, lbl_load_t3x, lbl_load_t3x_size);
+    C3D_TexSetFilter(&lbl_load_tex, GPU_LINEAR, GPU_NEAREST);
 
     gfx_3ds_minimap_init();
 }
@@ -441,7 +532,7 @@ int gfx_3ds_bottom_screen_draw(float *vertex_buffer, int vertex_offset)
                            gfx_3ds_rgb_to_abgr(COLOR_BACKGROUND));
 
     // While the file-select cursor is active, the bottom screen is a touchpad
-    // for it instead of the MAP/CHEATS/SETUP interface.
+    // for it instead of the bottom-screen tab interface.
     if (gFileSelectCursorActive)
     {
         gfx_3ds_menu_draw_touchpad(vertex_buffer);
@@ -458,6 +549,9 @@ int gfx_3ds_bottom_screen_draw(float *vertex_buffer, int vertex_offset)
             break;
         case BOTTOM_TAB_SETUP:
             gfx_3ds_menu_draw_setup(vertex_buffer);
+            break;
+        case BOTTOM_TAB_STATES:
+            gfx_3ds_menu_draw_states(vertex_buffer);
             break;
     }
 

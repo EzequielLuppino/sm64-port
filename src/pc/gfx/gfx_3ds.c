@@ -185,7 +185,7 @@ static void gfx_3ds_handle_touch() {
 
     // While the file-select cursor is on screen the bottom screen is a
     // touchpad for it: drag to aim, lift the finger to click. The
-    // MAP/CHEATS/SETUP interface is not available in the menus.
+    // bottom-screen tab interface is not available in the menus.
     if (gFileSelectCursorActive)
     {
         if (touching)

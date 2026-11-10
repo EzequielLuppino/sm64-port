@@ -16,6 +16,9 @@ extern bool audio_3ds_next_buffer_is_ready();
 // Used in audio_3ds when multi-threaded and level_script when single-threaded
 extern void audio_3ds_run_one_frame();
 
+// Clears the DSP wave queue after restoring a savestate.
+extern void audio_3ds_reset_dsp_queue(void);
+
 // Sets the volume of the NDSP directly.
 extern void audio_3ds_set_dsp_volume(float left, float right);
 

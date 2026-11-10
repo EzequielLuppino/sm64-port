@@ -31,6 +31,7 @@
 #include "controller/controller_keyboard.h"
 
 #include "configfile.h"
+#include "savestate_3ds.h"
 
 #include "compat.h"
 #include "debug_log.h"
@@ -144,6 +145,9 @@ void main_func(void) {
     DBG_LOG_INIT();
     DBG_LOG("main_func: start");
     main_pool_init(pool, pool + sizeof(pool));
+#ifdef TARGET_N3DS
+    savestate_3ds_register_pool(pool, sizeof(pool));
+#endif
     gEffectsMemoryPool = mem_pool_init(0x4000, MEMORY_POOL_LEFT);
 
     configfile_load(CONFIG_FILE);

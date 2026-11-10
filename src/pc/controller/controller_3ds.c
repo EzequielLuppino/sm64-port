@@ -54,8 +54,9 @@ static u32 controller_3ds_get_held(void)
     hidScanInput();
     u32 kDown = keysHeld();
 
-    // Moon jump cheat: ZR is not mapped to an N64 button, read it directly.
-    gCheatMoonJumpHeld = (kDown & KEY_ZR) != 0;
+    // Moon jump cheat: read the raw 3DS A button directly, independently of
+    // the remappable N64 A mapping.
+    gCheatMoonJumpHeld = (kDown & KEY_A) != 0;
 
     for (size_t i = 0; i < sizeof(button_mapping) / sizeof(button_mapping[0]); i++)
     {

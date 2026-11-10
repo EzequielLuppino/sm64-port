@@ -73,6 +73,10 @@ extern enum N3dsCpu s_audio_cpu;
 extern volatile __3ds_s32 s_audio_frames_to_tick;
 extern volatile __3ds_s32 s_audio_frames_to_process;
 
+// True while audio_3ds_run_one_frame() is touching audio/game state. Savestate
+// save/load waits for this to clear before copying memory.
+extern volatile bool s_audio_frame_active;
+
 // This is a purely informative value.
 // It is set to true when it acknowledges a new frame to process,
 // and to false when the audio thread begins spinning.

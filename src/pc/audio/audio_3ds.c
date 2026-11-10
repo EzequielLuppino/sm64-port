@@ -63,6 +63,7 @@ enum N3dsCpu s_audio_cpu = OLD_CORE_0;
 volatile __3ds_s32 s_audio_frames_to_tick = 0;
 volatile __3ds_s32 s_audio_frames_to_process = 0;
 volatile bool s_audio_thread_processing = false;
+volatile bool s_audio_frame_active = false;
 
 // Synchronization variables
 static volatile bool running = true;
@@ -171,7 +172,29 @@ static void audio_3ds_play_ext(const uint8_t *buf, size_t len)
         audio_3ds_play_internal(buf, len, len);
 }
 
+// Drops samples queued before a savestate was loaded. The wave buffer entries
+// still point at the same DMA memory, but their queue state no longer matches
+// the freshly restored audio state.
+void audio_3ds_reset_dsp_queue(void)
+{
+    if (!s_dsp_ready)
+        return;
+
+    ndspChnWaveBufClear(0);
+
+    for (int i = 0; i < N3DS_DSP_DMA_BUFFER_COUNT; i++)
+    {
+        sDspBuffers[i].nsamples = 0;
+        sDspBuffers[i].status = NDSP_WBUF_FREE;
+    }
+
+    sNextBuffer = 0;
+    memset(audio_buffer, 0, sizeof(audio_buffer));
+}
+
 inline void audio_3ds_run_one_frame() {
+
+    s_audio_frame_active = true;
 
     // If we've buffered less than desired, SAMPLES_HIGH; else, SAMPLES_LOW
     u32 num_audio_samples = audio_3ds_buffered() < audio_3ds_get_desired_buffered() ? SAMPLES_HIGH : SAMPLES_LOW;
@@ -194,6 +217,8 @@ inline void audio_3ds_run_one_frame() {
 
     // Play our audio buffer. If we outrun the DSP, we wait until the DSP is ready.
     audio_3ds_play_internal((u8 *)audio_buffer, N3DS_DSP_N_CHANNELS * num_audio_samples * 4, N3DS_DSP_N_CHANNELS * samples_to_copy * 4);
+
+    s_audio_frame_active = false;
 }
 
 Thread threadId = NULL;

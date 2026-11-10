@@ -350,6 +350,20 @@ O_FILES := $(foreach file,$(C_FILES),$(BUILD_DIR)/$(file:.c=.o)) \
            $(foreach file,$(S_FILES),$(BUILD_DIR)/$(file:.s=.o)) \
            $(foreach file,$(GENERATED_C_FILES),$(file:.c=.o))
 
+# The 3DS savestate code needs a contiguous view of the game's writable
+# globals. Core game objects are bracketed by marker objects, while src/pc
+# (front-end, renderer, audio backend and UI), the immutable sound data and
+# the libraries are linked after the end marker so they are not captured.
+ifeq ($(TARGET_N3DS),1)
+SAVESTATE_BOUNDS_START_O := $(BUILD_DIR)/3ds/savestate_bounds_start.o
+SAVESTATE_BOUNDS_END_O := $(BUILD_DIR)/3ds/savestate_bounds_end.o
+GAME_O_FILES := $(filter $(addprefix $(BUILD_DIR)/,src/engine/% src/game/% src/audio/% src/menu/% src/buffers/% actors/% levels/% bin/% data/% assets/%),$(O_FILES))
+HOST_O_FILES := $(filter-out $(GAME_O_FILES),$(O_FILES))
+LINK_O_FILES := $(SAVESTATE_BOUNDS_START_O) $(GAME_O_FILES) $(SAVESTATE_BOUNDS_END_O) $(HOST_O_FILES)
+else
+LINK_O_FILES := $(O_FILES)
+endif
+
 ULTRA_O_FILES := $(foreach file,$(ULTRA_S_FILES),$(BUILD_DIR)/$(file:.s=.o)) \
                  $(foreach file,$(ULTRA_C_FILES),$(BUILD_DIR)/$(file:.c=.o))
 
@@ -935,8 +949,8 @@ $(OPENDSP_O): $(OPENDSP_FIRMWARE)
 	@mkdir -p $(dir $@)
 	$(DEVKITPRO)/tools/bin/bin2s -a 4 $< | $(AS) -o $@
 
-$(ELF): $(O_FILES) $(MINIMAP_O) $(MIO0_FILES:.mio0=.o) $(SOUND_OBJ_FILES) $(ULTRA_O_FILES) $(GODDARD_O_FILES) $(BUILD_DIR)/src/pc/gfx/shader.shbin.o $(OPENDSP_O) $(SMDH_ICON)
-	$(LD) -L $(BUILD_DIR) -o $@ $(O_FILES) $(MINIMAP_O) $(BUILD_DIR)/src/pc/gfx/shader.shbin.o $(OPENDSP_O) $(MINIMAP_T3X_O) $(SOUND_OBJ_FILES) $(ULTRA_O_FILES) $(GODDARD_O_FILES) $(LDFLAGS)
+$(ELF): $(LINK_O_FILES) $(MINIMAP_O) $(MIO0_FILES:.mio0=.o) $(SOUND_OBJ_FILES) $(ULTRA_O_FILES) $(GODDARD_O_FILES) $(BUILD_DIR)/src/pc/gfx/shader.shbin.o $(OPENDSP_O) $(SMDH_ICON)
+	$(LD) -L $(BUILD_DIR) -o $@ $(LINK_O_FILES) $(MINIMAP_O) $(BUILD_DIR)/src/pc/gfx/shader.shbin.o $(OPENDSP_O) $(MINIMAP_T3X_O) $(SOUND_OBJ_FILES) $(ULTRA_O_FILES) $(GODDARD_O_FILES) $(LDFLAGS)
 
 $(EXE): $(ELF)
 	3dsxtool $< $@ --smdh=$(BUILD_DIR)/$(SMDH_ICON)
