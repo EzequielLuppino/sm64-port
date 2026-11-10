@@ -7,6 +7,7 @@ This document describes how to remap controls for SM643DS using the `sm64config.
 ## Caveats and Limitations
 
 - All of the N64 and 3DS buttons are available to remap except for the N64 Analog Stick and 3DS Circle Pad, as their mapping is hard-coded.
+- The New 3DS C-Stick is reserved for the analog camera (orbit/pitch, see the README) and cannot be used for button mappings. Its `KEY_CSTICK_*` bits are masked out at runtime, so an old `sm64config.txt` that still binds them to the N64 C buttons keeps working through the D-pad without fighting the camera.
 - Only the Player 1 controller can be used.
 - On older versions of the 3DS port, and also currently on the PC port, the N64 D-Pad was not mappable, as the vanilla game only uses it for debug controls. This port allows mapping the N64 D-Pad, so ensure that your version is up-to-date if you wish to use it.
 
@@ -69,6 +70,7 @@ The following 3DS buttons are supported by SM643DS.
 ## Notes
 
 - The 3DS Circle Pad can actually be bound to N64 buttons, but it cannot be unbound from the N64 Analog Stick from within `sm64config.txt,` so its codes were omitted here.
+- The C-Stick codes above are listed for completeness, but on this port the C-Stick is reserved for the analog camera (see [Caveats and Limitations](#caveats-and-limitations)) and those bits are ignored for button input.
 - The Touch Screen's virtual buttons cannot currently be edited.
 - When running on the Old 3DS, mapping buttons only present on the New 3DS is harmless.
 - If duplicate config entries exist in `sm64config.txt,` the last entry will be the only one used.

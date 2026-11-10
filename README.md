@@ -6,7 +6,7 @@ A prior copy of the game is required to extract the assets.
 ## Changes vs. Vanilla 3DS Port
 
  - Based off [Refresh 11](https://github.com/sm64-port/sm64-port/commit/9214dddabcce4723d9b6cda2ebccbac209f6447d)
- - Stereo 3D support; use the mini-menu to switch between 3D (400px) and 800px modes (800PX/AA disabled in 3D mode)
+ - Stereo 3D support; use the SETUP tab to switch between 3D (400px) and 800px modes (800PX/AA disabled in 3D mode)
  - Multi-threaded; audio thread runs on Core 1 on O3DS and Core 2 on N3DS; needs [Luma v10.1.1](https://github.com/LumaTeam/Luma3DS/releases) or higher
  - Audio works without a DSP firmware dump: [OpenDSP](https://github.com/Cellenseres/OpenDSP) (BSD-2-Clause) is embedded as a fallback, so no `/3ds/dspfirm.cdc` is required. See `3ds/OPENDSP_LICENSE.txt`.
  - Naïve frame-skip if frame takes longer than 33.3ms (1 / 30 FPS) to render. This option is no longer very useful, but is still available for posterity.
@@ -17,6 +17,13 @@ A prior copy of the game is required to extract the assets.
      - By default, 3DS audio uses some inaccurate math to increase performance with no perceptible loss in quality. To disable this, build with `AUDIO_USE_ACCURATE_MATH=1`. This may have no effect depending on the audio implementation being used; for example, Reference RSPA ignores this flag.
  - Configurable controls via `sm64config.txt`
      - See [3DS_CONTROLLER_REMAPPING.md](3DS_CONTROLLER_REMAPPING.md).
+ - New 3DS C-Stick analog camera
+     - Smooth right-stick orbit and pitch control like a modern third-person game; the camera stays where you leave it instead of drifting back on its own
+     - Works in the standard follow cameras (normal play, the close/indoor camera, water surface, free roam) and in the radial camera used by areas such as Bob-omb Battlefield, where yaw stays within the level's designed ±105° range and vertical framing remains terrain-driven
+     - Scripted camera sections (fixed, 8-direction, outward-radial, cannon, spiral stairs) keep their designed framing
+     - The C-Stick is reserved for the camera: it no longer acts as the digital N64 C buttons, and its `KEY_CSTICK_*` bits are ignored by button mappings; the D-pad keeps the C-button defaults
+     - On an original 3DS (no C-Stick) nothing changes: the analog input simply reads as centered
+     - Tuning lives in `src/pc/camera_3ds.c` (deadzone, rotation rates, pitch limits)
  - GFX_POOL_SIZE [fix](https://github.com/aboood40091/sm64-port/commit/6ae4f4687ed234291ac1e572b75d65191ca9f364) (support 60 FPS on 32bit platforms)
  - Bottom-screen tabbed menu (tap the touch screen to open)
      - **MAP**: touch-screen minimap and camera controls similar to SM64DS

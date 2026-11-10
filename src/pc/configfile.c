@@ -64,10 +64,12 @@ unsigned int configKeyStart      = KEY_START;
 unsigned int configKeyL          = KEY_SELECT;
 unsigned int configKeyR          = KEY_L;
 unsigned int configKeyZ          = KEY_R;
-unsigned int configKeyCUp        = KEY_DUP | KEY_CSTICK_UP;
-unsigned int configKeyCDown      = KEY_DDOWN | KEY_CSTICK_DOWN;
-unsigned int configKeyCLeft      = KEY_DLEFT | KEY_CSTICK_LEFT;
-unsigned int configKeyCRight     = KEY_DRIGHT | KEY_CSTICK_RIGHT;
+// The New 3DS C-Stick is reserved for the analog camera (pc/camera_3ds.c) and
+// is masked out of button input, so the N64 C buttons default to the D-pad.
+unsigned int configKeyCUp        = KEY_DUP;
+unsigned int configKeyCDown      = KEY_DDOWN;
+unsigned int configKeyCLeft      = KEY_DLEFT;
+unsigned int configKeyCRight     = KEY_DRIGHT;
 unsigned int configKeyStickUp    = 0;
 unsigned int configKeyStickDown  = 0;
 unsigned int configKeyStickLeft  = 0;

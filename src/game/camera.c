@@ -29,6 +29,10 @@
 #include "engine/graph_node.h"
 #include "level_table.h"
 
+#ifdef TARGET_N3DS
+#include "pc/camera_3ds.h"
+#endif
+
 #define CBUTTON_MASK (U_CBUTTONS | D_CBUTTONS | L_CBUTTONS | R_CBUTTONS)
 
 /**
@@ -1151,6 +1155,12 @@ void mode_radial_camera(struct Camera *c) {
     radial_camera_input_default(c);
     radial_camera_move(c);
 
+#ifdef TARGET_N3DS
+    // New 3DS: the radial camera builds its yaw from sModeOffsetYaw, so feed
+    // the analog C-Stick there instead of rotating the camera position.
+    camera_3ds_update_radial(&sModeOffsetYaw);
+#endif
+
     if (c->mode == CAMERA_MODE_RADIAL) {
         lakitu_zoom(400.f, 0x900);
     }
@@ -2227,7 +2237,16 @@ s16 update_default_camera(struct Camera *c) {
             yawVel = 0;
         }
         if (yawVel != 0 && get_dialog_id() == -1) {
-            camera_approach_s16_symmetric_bool(&yaw, yawGoal, yawVel);
+#ifdef TARGET_N3DS
+            // After the player has aimed the camera with the C-Stick, skip the
+            // slow idle auto-recenter so the camera stays where they put it.
+            // Fast safety turns (yawVel > 0x100, e.g. walls or being too close
+            // to Mario) still apply.
+            if (yawVel > 0x100 || !camera_3ds_manual_camera_active())
+#endif
+            {
+                camera_approach_s16_symmetric_bool(&yaw, yawGoal, yawVel);
+            }
         }
     }
 
@@ -3072,6 +3091,13 @@ void update_camera(struct Camera *c) {
             }
         }
     }
+#ifdef TARGET_N3DS
+    // New 3DS: let the C-Stick orbit the camera before the mode's own position
+    // and collision update, so the rotation survives and cannot put the camera
+    // inside geometry.
+    camera_3ds_update_cstick(c);
+#endif
+
     // If not in a cutscene, do mode processing
     if (c->cutscene == 0) {
         sYawSpeed = 0x400;

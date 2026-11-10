@@ -52,7 +52,11 @@ static u32 controller_3ds_get_held(void)
 {
     u32 res = 0;
     hidScanInput();
-    u32 kDown = keysHeld();
+    // The New 3DS C-Stick is a camera axis on this port, not a button: strip
+    // its digital bits so configs that still map them to the N64 C buttons
+    // cannot fight the analog camera (see pc/camera_3ds.c).
+    u32 kDown = keysHeld() & ~(KEY_CSTICK_UP | KEY_CSTICK_DOWN | KEY_CSTICK_LEFT
+                               | KEY_CSTICK_RIGHT);
 
     // Moon jump cheat: read the raw 3DS A button directly, independently of
     // the remappable N64 A mapping.
@@ -71,6 +75,12 @@ static u32 controller_3ds_get_held(void)
 static void controller_3ds_init(void)
 {
     u32 i = 0;
+
+    // The C-Stick analog values live in the ir:rst service's shared memory;
+    // hidKeysHeld() only exposes its digital direction bits. Failure is not
+    // fatal: without it the C-Stick simply reads as centered.
+    irrstInit();
+
     DBG_LOG("3ds controller init: key_a=0x%x key_b=0x%x key_start=0x%x key_z=0x%x",
             configKeyA, configKeyB, configKeyStart, configKeyZ);
     set_button_mapping(i++, A_BUTTON,     configKeyA); // n64 button => configured button
@@ -91,6 +101,9 @@ static void controller_3ds_init(void)
 
 static void controller_3ds_read(OSContPad *pad)
 {
+    // Refresh the C-Stick analog cache read by pc/camera_3ds.c.
+    irrstScanInput();
+
     pad->button = controller_3ds_get_held();
 
     circlePosition pos;
@@ -102,7 +115,8 @@ static void controller_3ds_read(OSContPad *pad)
     // (24 raw units -> 3 pixels per frame in handle_controller_cursor_input.)
     // Uses the raw HID bits because the D-pad keys are unmapped by default.
     if (gFileSelectCursorActive) {
-        u32 dpad = keysHeld();
+        u32 dpad = keysHeld() & ~(KEY_CSTICK_UP | KEY_CSTICK_DOWN | KEY_CSTICK_LEFT
+                                  | KEY_CSTICK_RIGHT);
 
         if (dpad & KEY_DRIGHT) {
             pad->stick_x = 24;
